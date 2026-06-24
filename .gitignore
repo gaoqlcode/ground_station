@@ -1,0 +1,33 @@
+# Qt 编译产物
+build-*
+build/
+cmake-build-*
+*.o
+*.obj
+*.moc
+*.rcc
+*.ui
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.session
+
+# Qt Creator 本地缓存
+.qtcreator/
+.qtcreator-cmake/
+.qtcreator.qws
+
+# 可执行程序、库
+*.exe
+*.dll
+*.so
+*.a
+*.lib
+*.out
+
+# 临时文件
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db

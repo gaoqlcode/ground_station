@@ -1,0 +1,113 @@
+#ifndef GROUND_STATION_VIDEORENDERER_H
+#define GROUND_STATION_VIDEORENDERER_H
+
+#include <QColor>
+#include <QElapsedTimer>
+#include <QMap>
+#include <QMutex>
+#include <QOpenGLFunctions_3_0>
+#include <QOpenGLShaderProgram>
+#include <QOpenGLTexture>
+#include <QOpenGLWidget>
+#include <QRectF>
+#include <QSizeF>
+#include <QWidget>
+
+#include "framebuffer.h"
+#include "videostats.h"
+
+namespace ground_station {
+
+class VideoRenderer : public QOpenGLWidget, protected QOpenGLFunctions_3_0
+{
+    Q_OBJECT
+
+public:
+    enum class RenderMode {
+        Stretch,
+        KeepAspectRatio,
+        KeepAspectRatioByExpanding
+    };
+
+    explicit VideoRenderer(QWidget *parent = nullptr);
+    ~VideoRenderer() override;
+
+    void setFrameBuffer(const QSharedPointer<FrameBuffer> &buffer);
+    void setVideoStats(VideoStats *stats);
+    void setStreamId(int streamId);
+    void setRenderMode(RenderMode mode);
+    void setBackgroundColor(const QColor &color);
+    void updateFrame(const VideoFramePtr &frame);
+    VideoFramePtr currentFrame() const;
+    double renderFps() const;
+    void clearFrame();
+    void setVSyncEnabled(bool enabled);
+    bool isVSyncEnabled() const;
+
+signals:
+    void frameRendered(quint64 frameId, double renderTimeMs);
+    void renderError(const QString &error);
+
+protected:
+    void initializeGL() override;
+    void resizeGL(int width, int height) override;
+    void paintGL() override;
+
+private:
+    bool initShaders();
+    bool initVertexBuffer();
+    void updateTexture(const cv::Mat &image);
+    void renderFrame();
+    QRectF calculateRenderRect(const QSizeF &frameSize, const QSizeF &widgetSize);
+    void updateFpsStats();
+
+    QOpenGLShaderProgram *m_shaderProgram;
+    GLuint m_textureId;
+    GLuint m_vboId;
+    GLuint m_vaoId;
+
+    QSharedPointer<FrameBuffer> m_frameBuffer;
+    VideoFramePtr m_currentFrame;
+    VideoFramePtr m_pendingFrame;
+    mutable QMutex m_frameMutex;
+
+    VideoStats *m_videoStats;
+    int m_streamId;
+
+    RenderMode m_renderMode;
+    QColor m_backgroundColor;
+    bool m_vsyncEnabled;
+
+    QElapsedTimer m_renderTimer;
+    QElapsedTimer m_fpsTimer;
+    int m_frameCount;
+    double m_renderFps;
+};
+
+class MultiStreamRenderer : public QObject
+{
+    Q_OBJECT
+
+public:
+    explicit MultiStreamRenderer(QObject *parent = nullptr);
+    ~MultiStreamRenderer() override;
+
+    VideoRenderer *addStream(int streamId, QWidget *parentWidget = nullptr);
+    void removeStream(int streamId);
+    VideoRenderer *getRenderer(int streamId) const;
+    bool hasStream(int streamId) const;
+    QList<int> streamIds() const;
+    void setVideoStats(VideoStats *stats);
+    void setRenderMode(VideoRenderer::RenderMode mode);
+    void clearAll();
+
+private:
+    mutable QMutex m_mutex;
+    QMap<int, VideoRenderer *> m_renderers;
+    VideoStats *m_videoStats;
+    VideoRenderer::RenderMode m_renderMode;
+};
+
+} // namespace ground_station
+
+#endif // GROUND_STATION_VIDEORENDERER_H
